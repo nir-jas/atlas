@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from atlas_api.core.config import settings
 from atlas_api.db.base import Base
-from atlas_api.models import Document
+from atlas_api.models import Chunk, Document
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.resolved_database_url)
@@ -48,4 +48,4 @@ if context.is_offline_mode():
 else:
     run_migrations_online()
 
-_ = Document
+_ = (Chunk, Document)

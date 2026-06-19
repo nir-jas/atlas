@@ -10,6 +10,7 @@ from atlas_api.core.config import settings
 from atlas_api.db.session import get_session
 from atlas_api.repositories.documents import DocumentRepository
 from atlas_api.repositories.memory import InMemoryKnowledgeRepository
+from atlas_api.services.chunking import ChunkingService
 from atlas_api.services.documents import DocumentService
 from atlas_api.services.knowledge import KnowledgeService
 
@@ -31,4 +32,8 @@ UploadDirDep = Annotated[Path, Depends(get_upload_dir)]
 
 def get_document_service(session: SessionDep, upload_dir: UploadDirDep) -> DocumentService:
     repository = DocumentRepository(session)
-    return DocumentService(repository=repository, upload_dir=upload_dir)
+    return DocumentService(
+        repository=repository,
+        upload_dir=upload_dir,
+        chunking_service=ChunkingService(),
+    )
