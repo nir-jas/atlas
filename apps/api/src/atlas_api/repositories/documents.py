@@ -2,9 +2,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from atlas_api.models.chunk import Chunk
+from atlas_api.models.chunk_embedding import ChunkEmbedding
 from atlas_api.models.document import Document
 from atlas_api.schemas.chunks import ChunkCreate
 from atlas_api.schemas.documents import DocumentCreate
+from atlas_api.schemas.embeddings import ChunkEmbeddingCreate
 
 
 class DocumentRepository:
@@ -18,14 +20,24 @@ class DocumentRepository:
         self._session.refresh(document)
         return document
 
-    def create_with_chunks(self, payload: DocumentCreate, chunks: list[ChunkCreate]) -> Document:
+    def create_with_chunks(
+        self,
+        payload: DocumentCreate,
+        chunks: list[ChunkCreate],
+        embeddings: list[ChunkEmbeddingCreate],
+    ) -> Document:
         try:
             document = Document(**payload.model_dump())
             self._session.add(document)
             self._session.flush()
 
-            for chunk in chunks:
-                self._session.add(Chunk(document_id=document.id, **chunk.model_dump()))
+            for chunk, embedding in zip(chunks, embeddings, strict=True):
+                chunk_record = Chunk(document_id=document.id, **chunk.model_dump())
+                self._session.add(chunk_record)
+                self._session.flush()
+                self._session.add(
+                    ChunkEmbedding(chunk_id=chunk_record.id, **embedding.model_dump())
+                )
 
             document.status = "indexed"
             self._session.commit()

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from atlas_api.ai_providers.local import LocalAIProvider
 from atlas_api.core.config import settings
 from atlas_api.db.session import get_session
+from atlas_api.embedding_providers.fake import FakeEmbeddingProvider
 from atlas_api.repositories.documents import DocumentRepository
 from atlas_api.repositories.memory import InMemoryKnowledgeRepository
 from atlas_api.services.chunking import ChunkingService
@@ -36,4 +37,5 @@ def get_document_service(session: SessionDep, upload_dir: UploadDirDep) -> Docum
         repository=repository,
         upload_dir=upload_dir,
         chunking_service=ChunkingService(),
+        embedding_provider=FakeEmbeddingProvider(),
     )

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from atlas_api.db.base import Base
 
 if TYPE_CHECKING:
+    from atlas_api.models.chunk_embedding import ChunkEmbedding
     from atlas_api.models.document import Document
 
 
@@ -31,3 +32,7 @@ class Chunk(Base):
     )
 
     document: Mapped["Document"] = relationship(back_populates="chunks")
+    embedding: Mapped["ChunkEmbedding | None"] = relationship(
+        back_populates="chunk",
+        cascade="all, delete-orphan",
+    )

@@ -115,6 +115,8 @@ Then open `http://localhost:3000`.
   access behind repositories, and model-provider calls behind provider
   abstractions.
 - Add migrations before using PostgreSQL for production data.
+- Plain text, Markdown, and PDFs with extractable text are chunked and indexed.
+  Other file types are stored as uploaded documents until an extractor exists.
 
 ## License
 

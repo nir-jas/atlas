@@ -1,5 +1,9 @@
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import PurePath
+
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from atlas_api.schemas.chunks import ChunkCreate
 
@@ -11,16 +15,27 @@ class TextSegment:
 
 
 class ChunkingService:
+    _TEXT_SUFFIXES = {".txt", ".text"}
+    _MARKDOWN_SUFFIXES = {".md", ".markdown"}
+    _PDF_SUFFIXES = {".pdf"}
+
     def __init__(self, max_characters: int = 1_000) -> None:
         self._max_characters = max_characters
 
     def chunk_document(self, filename: str, content: bytes) -> list[ChunkCreate]:
-        text = content.decode("utf-8", errors="ignore").strip()
+        suffix = PurePath(filename).suffix.lower()
+        supported_suffixes = self._TEXT_SUFFIXES | self._MARKDOWN_SUFFIXES | self._PDF_SUFFIXES
+        if suffix not in supported_suffixes:
+            return []
+
+        text = self._extract_pdf_text(content) if suffix in self._PDF_SUFFIXES else (
+            content.decode("utf-8", errors="ignore")
+        )
+        text = text.replace("\x00", "").strip()
         if not text:
             return []
 
-        suffix = PurePath(filename).suffix.lower()
-        segments = self._markdown_segments(text) if suffix in {".md", ".markdown"} else [
+        segments = self._markdown_segments(text) if suffix in self._MARKDOWN_SUFFIXES else [
             TextSegment(text=text, section=None)
         ]
         chunks: list[ChunkCreate] = []
@@ -102,3 +117,17 @@ class ChunkingService:
             for start in range(0, len(text), self._max_characters)
             if text[start : start + self._max_characters].strip()
         ]
+
+    def _extract_pdf_text(self, content: bytes) -> str:
+        try:
+            reader = PdfReader(BytesIO(content))
+        except (PdfReadError, ValueError):
+            return ""
+
+        page_text = []
+        for page in reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                page_text.append(extracted)
+
+        return "\n\n".join(page_text)
