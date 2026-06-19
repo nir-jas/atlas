@@ -1,0 +1,6 @@
+{
+  "include": ["apps/api/src", "apps/api/tests"],
+  "extraPaths": ["apps/api/src"],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic"
+}

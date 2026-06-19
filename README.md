@@ -64,25 +64,31 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
    docker compose up -d postgres
    ```
 
-4. Run the API:
+4. Apply database migrations:
+
+   ```bash
+   uv run alembic upgrade head
+   ```
+
+5. Run the API:
 
    ```bash
    uv run uvicorn atlas_api.main:app --app-dir apps/api/src --reload
    ```
 
-5. Check the health endpoint:
+6. Check the health endpoint:
 
    ```bash
    curl http://localhost:8000/health
    ```
 
-6. Try the versioned API:
+7. Try the versioned API:
 
    ```bash
    curl http://localhost:8000/api/v1/notes
    ```
 
-7. Run tests:
+8. Run tests:
 
    ```bash
    uv run pytest
