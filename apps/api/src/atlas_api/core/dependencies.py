@@ -11,9 +11,11 @@ from atlas_api.db.session import get_session
 from atlas_api.embedding_providers.fake import FakeEmbeddingProvider
 from atlas_api.repositories.documents import DocumentRepository
 from atlas_api.repositories.memory import InMemoryKnowledgeRepository
+from atlas_api.repositories.retrieval import RetrievalRepository
 from atlas_api.services.chunking import ChunkingService
 from atlas_api.services.documents import DocumentService
 from atlas_api.services.knowledge import KnowledgeService
+from atlas_api.services.retrieval import RetrievalService
 
 
 @lru_cache
@@ -37,5 +39,12 @@ def get_document_service(session: SessionDep, upload_dir: UploadDirDep) -> Docum
         repository=repository,
         upload_dir=upload_dir,
         chunking_service=ChunkingService(),
+        embedding_provider=FakeEmbeddingProvider(),
+    )
+
+
+def get_retrieval_service(session: SessionDep) -> RetrievalService:
+    return RetrievalService(
+        repository=RetrievalRepository(session),
         embedding_provider=FakeEmbeddingProvider(),
     )
