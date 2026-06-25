@@ -11,6 +11,7 @@ from atlas_api.core.config import settings
 from atlas_api.core.dependencies import (
     get_embedding_provider,
     get_llm_provider,
+    get_query_rewrite_service,
     get_upload_dir,
 )
 from atlas_api.db.base import Base
@@ -19,6 +20,8 @@ from atlas_api.embedding_providers.fake import FakeEmbeddingProvider
 from atlas_api.llm_providers.fake import FakeLLMProvider
 from atlas_api.main import create_app
 from atlas_api.models import Chunk, ChunkEmbedding, Document
+from atlas_api.query_rewrite_providers.fake import FakeQueryRewriteProvider
+from atlas_api.services.query_rewrite import QueryRewriteService
 
 TestingSessionFactory = sessionmaker[Session]
 
@@ -48,11 +51,15 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     def override_get_llm_provider() -> FakeLLMProvider:
         return FakeLLMProvider()
 
+    def override_get_query_rewrite_service() -> QueryRewriteService:
+        return QueryRewriteService(FakeQueryRewriteProvider())
+
     app = create_app()
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_upload_dir] = override_get_upload_dir
     app.dependency_overrides[get_embedding_provider] = override_get_embedding_provider
     app.dependency_overrides[get_llm_provider] = override_get_llm_provider
+    app.dependency_overrides[get_query_rewrite_service] = override_get_query_rewrite_service
 
     with TestClient(app) as test_client:
         yield test_client
@@ -130,6 +137,7 @@ def test_search_response_includes_chunk_metadata_and_score(client: TestClient) -
     assert result["chunk_index"] == 0
     assert "Atlas retrieval exposes source metadata." in result["text"]
     assert isinstance(result["similarity_score"], float)
+    assert text in result["matched_queries"]
 
 
 def test_answer_generation_returns_citations_separately(client: TestClient) -> None:

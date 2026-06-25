@@ -167,6 +167,7 @@ def test_context_preview_returns_the_exact_assembled_chunk_set() -> None:
                 "chunk_index": 0,
                 "text": "Atlas assembles retrieved context.",
                 "similarity_score": 0.95,
+                "matched_queries": [],
             }
         ],
         "assembled_context": (

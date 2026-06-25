@@ -112,6 +112,12 @@ model. The OpenAI `text-embedding-3-small` default is 1536. `/rag/search`
 continues to accept the same request body; it now embeds the query and asks
 PostgreSQL with pgvector to rank the matching chunks.
 
+Retrieval expands each request with deterministic query rewrites before search.
+The original query is always searched first, followed by fake-provider rewrites
+in local development and tests. Atlas searches every query, merges the results,
+deduplicates by `chunk_id`, keeps the highest similarity score for each chunk,
+and returns `matched_queries` metadata showing which queries retrieved it.
+
 To run PostgreSQL integration coverage, point `ATLAS_TEST_DATABASE_URL` at an
 isolated pgvector-enabled test database. It uses the fake provider and does not
 call OpenAI:

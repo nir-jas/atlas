@@ -16,6 +16,7 @@ class SearchResult(BaseModel):
     chunk_index: int
     text: str
     similarity_score: float
+    matched_queries: list[str] = Field(default_factory=list)
 
 
 class ContextPreviewRequest(SearchRequest):

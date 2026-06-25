@@ -14,6 +14,7 @@ from atlas_api.embedding_providers.openai import OpenAIEmbeddingProvider
 from atlas_api.llm_providers.base import LLMProvider
 from atlas_api.llm_providers.fake import FakeLLMProvider
 from atlas_api.llm_providers.openai import OpenAILLMProvider
+from atlas_api.query_rewrite_providers.fake import FakeQueryRewriteProvider
 from atlas_api.repositories.documents import DocumentRepository
 from atlas_api.repositories.memory import InMemoryKnowledgeRepository
 from atlas_api.repositories.retrieval import RetrievalRepository
@@ -22,6 +23,7 @@ from atlas_api.services.chunking import ChunkingService
 from atlas_api.services.context_assembly import ContextAssemblyService
 from atlas_api.services.documents import DocumentService
 from atlas_api.services.knowledge import KnowledgeService
+from atlas_api.services.query_rewrite import QueryRewriteService
 from atlas_api.services.retrieval import RetrievalService
 
 
@@ -59,10 +61,19 @@ def get_llm_provider() -> LLMProvider:
     )
 
 
+@lru_cache
+def get_query_rewrite_service() -> QueryRewriteService:
+    return QueryRewriteService(provider=FakeQueryRewriteProvider())
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 UploadDirDep = Annotated[Path, Depends(get_upload_dir)]
 EmbeddingProviderDep = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
 LLMProviderDep = Annotated[LLMProvider, Depends(get_llm_provider)]
+QueryRewriteServiceDep = Annotated[
+    QueryRewriteService,
+    Depends(get_query_rewrite_service),
+]
 
 
 def get_document_service(
@@ -82,10 +93,12 @@ def get_document_service(
 def get_retrieval_service(
     session: SessionDep,
     embedding_provider: EmbeddingProviderDep,
+    query_rewrite_service: QueryRewriteServiceDep,
 ) -> RetrievalService:
     return RetrievalService(
         repository=RetrievalRepository(session),
         embedding_provider=embedding_provider,
+        query_rewrite_service=query_rewrite_service,
     )
 
 
@@ -105,11 +118,13 @@ def get_answer_generation_service(
     embedding_provider: EmbeddingProviderDep,
     context_assembly_service: ContextAssemblyServiceDep,
     llm_provider: LLMProviderDep,
+    query_rewrite_service: QueryRewriteServiceDep,
 ) -> AnswerGenerationService:
     return AnswerGenerationService(
         retrieval_service=RetrievalService(
             repository=RetrievalRepository(session),
             embedding_provider=embedding_provider,
+            query_rewrite_service=query_rewrite_service,
         ),
         context_assembly_service=context_assembly_service,
         llm_provider=llm_provider,
