@@ -109,14 +109,38 @@ VECTOR_DIMENSIONS=1536
 
 `VECTOR_DIMENSIONS` must match the output size requested from the embedding
 model. The OpenAI `text-embedding-3-small` default is 1536. `/rag/search`
-continues to accept the same request body; it now embeds the query and asks
-PostgreSQL with pgvector to rank the matching chunks.
+embeds the query and asks PostgreSQL with pgvector to rank matching chunks when
+`search_mode` is `vector` or `hybrid`.
 
 Retrieval expands each request with deterministic query rewrites before search.
 The original query is always searched first, followed by fake-provider rewrites
 in local development and tests. Atlas searches every query, merges the results,
 deduplicates by `chunk_id`, keeps the highest similarity score for each chunk,
 and returns `matched_queries` metadata showing which queries retrieved it.
+
+`/rag/search` and `/rag/answer` accept `search_mode` values of `vector`,
+`keyword`, and `hybrid`; `hybrid` is the default. Keyword search runs over chunk
+text and uses PostgreSQL full-text search in PostgreSQL-backed environments,
+with a small SQLite fallback for local tests. Hybrid search runs vector and
+keyword search independently, merges the result sets, deduplicates by
+`chunk_id`, and ranks with reciprocal rank fusion: each source contributes
+`1 / (60 + rank)` and chunks found by both sources move up. Results preserve
+`source_name`, `collection`, `section`, `chunk_index`, `similarity_score`,
+`keyword_rank`, and `matched_by` metadata.
+
+Reranking is an optional second pass after retrieval. When enabled, Atlas first
+fetches `top_k` candidates with the selected search mode, scores each chunk
+against the original user query, sorts by `reranker_score`, keeps up to
+`RERANKER_TOP_K`, and removes chunks below `RERANKER_SCORE_THRESHOLD`. The fake
+provider is deterministic and local; no external reranker APIs are configured
+yet.
+
+```dotenv
+RERANKER_ENABLED=false
+RERANKER_PROVIDER=fake
+RERANKER_TOP_K=5
+RERANKER_SCORE_THRESHOLD=0.80
+```
 
 To run PostgreSQL integration coverage, point `ATLAS_TEST_DATABASE_URL` at an
 isolated pgvector-enabled test database. It uses the fake provider and does not
@@ -156,7 +180,9 @@ the prompt inspectable before an LLM is introduced.
 `similarity_score_threshold` (or `ANSWER_SIMILARITY_SCORE_THRESHOLD`), retains
 the highest-ranked chunks that fit `ANSWER_CONTEXT_MAX_CHARACTERS`, assembles
 their context, and generates an answer. Citations are generated from the exact
-selected chunks and returned separately from the answer text.
+selected chunks and returned separately from the answer text. The response also
+returns the selected `retrieved_chunks` so retrieval, keyword, and reranker
+metadata can be inspected.
 
 ```json
 {

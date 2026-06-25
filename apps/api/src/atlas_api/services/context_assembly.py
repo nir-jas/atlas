@@ -32,7 +32,8 @@ class ContextAssemblyService:
             selected_chunks = [
                 chunk
                 for chunk in selected_chunks
-                if chunk.similarity_score >= similarity_score_threshold
+                if chunk.similarity_score is None
+                or chunk.similarity_score >= similarity_score_threshold
             ]
         if max_chunks is not None:
             selected_chunks = selected_chunks[:max_chunks]

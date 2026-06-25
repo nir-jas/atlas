@@ -92,6 +92,8 @@ def test_answer_generation_uses_selected_context_and_returns_citations() -> None
 
     assert result.answer == "Grounded answer."
     assert result.retrieved_chunks_count == 2
+    assert result.reranker_enabled is False
+    assert result.retrieved_chunks == [first, second]
     assert [citation.model_dump() for citation in result.citations] == [
         {"source": "rag.md", "section": "Pipeline", "chunk_id": "10"},
         {"source": "rag.md", "section": "Unspecified", "chunk_id": "11"},
@@ -128,6 +130,8 @@ def test_answer_generation_does_not_call_llm_without_qualifying_context() -> Non
     assert result.answer == INSUFFICIENT_CONTEXT_ANSWER
     assert result.citations == []
     assert result.retrieved_chunks_count == 0
+    assert result.reranker_enabled is False
+    assert result.retrieved_chunks == []
     assert llm_provider.calls == []
 
 
@@ -156,5 +160,6 @@ def test_answer_generation_stops_at_the_context_budget() -> None:
     ).answer(AnswerRequest(query="Question"))
 
     assert result.retrieved_chunks_count == 1
+    assert result.retrieved_chunks == [first]
     assert [citation.chunk_id for citation in result.citations] == ["1"]
     assert llm_provider.calls == [("Question", first_context)]

@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +27,10 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-5.4"
     answer_similarity_score_threshold: float = 0.0
     answer_context_max_characters: int = 12_000
+    reranker_enabled: bool = False
+    reranker_provider: Literal["fake"] = "fake"
+    reranker_top_k: int = Field(default=5, ge=1, le=100)
+    reranker_score_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
     ai_provider: str = "local"
     upload_dir: str = "data/uploads"
 

@@ -18,12 +18,15 @@ from atlas_api.query_rewrite_providers.fake import FakeQueryRewriteProvider
 from atlas_api.repositories.documents import DocumentRepository
 from atlas_api.repositories.memory import InMemoryKnowledgeRepository
 from atlas_api.repositories.retrieval import RetrievalRepository
+from atlas_api.reranker_providers.base import RerankerProvider
+from atlas_api.reranker_providers.fake import FakeRerankerProvider
 from atlas_api.services.answer_generation import AnswerGenerationService
 from atlas_api.services.chunking import ChunkingService
 from atlas_api.services.context_assembly import ContextAssemblyService
 from atlas_api.services.documents import DocumentService
 from atlas_api.services.knowledge import KnowledgeService
 from atlas_api.services.query_rewrite import QueryRewriteService
+from atlas_api.services.reranking import RerankerService
 from atlas_api.services.retrieval import RetrievalService
 
 
@@ -66,6 +69,22 @@ def get_query_rewrite_service() -> QueryRewriteService:
     return QueryRewriteService(provider=FakeQueryRewriteProvider())
 
 
+@lru_cache
+def get_reranker_provider() -> RerankerProvider:
+    provider_factories = {"fake": FakeRerankerProvider}
+    return provider_factories[settings.reranker_provider]()
+
+
+@lru_cache
+def get_reranker_service() -> RerankerService:
+    return RerankerService(
+        provider=get_reranker_provider(),
+        enabled=settings.reranker_enabled,
+        top_k=settings.reranker_top_k,
+        score_threshold=settings.reranker_score_threshold,
+    )
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 UploadDirDep = Annotated[Path, Depends(get_upload_dir)]
 EmbeddingProviderDep = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
@@ -74,6 +93,7 @@ QueryRewriteServiceDep = Annotated[
     QueryRewriteService,
     Depends(get_query_rewrite_service),
 ]
+RerankerServiceDep = Annotated[RerankerService, Depends(get_reranker_service)]
 
 
 def get_document_service(
@@ -94,11 +114,13 @@ def get_retrieval_service(
     session: SessionDep,
     embedding_provider: EmbeddingProviderDep,
     query_rewrite_service: QueryRewriteServiceDep,
+    reranker_service: RerankerServiceDep,
 ) -> RetrievalService:
     return RetrievalService(
         repository=RetrievalRepository(session),
         embedding_provider=embedding_provider,
         query_rewrite_service=query_rewrite_service,
+        reranker_service=reranker_service,
     )
 
 
@@ -119,12 +141,14 @@ def get_answer_generation_service(
     context_assembly_service: ContextAssemblyServiceDep,
     llm_provider: LLMProviderDep,
     query_rewrite_service: QueryRewriteServiceDep,
+    reranker_service: RerankerServiceDep,
 ) -> AnswerGenerationService:
     return AnswerGenerationService(
         retrieval_service=RetrievalService(
             repository=RetrievalRepository(session),
             embedding_provider=embedding_provider,
             query_rewrite_service=query_rewrite_service,
+            reranker_service=reranker_service,
         ),
         context_assembly_service=context_assembly_service,
         llm_provider=llm_provider,

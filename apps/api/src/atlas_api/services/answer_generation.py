@@ -23,6 +23,7 @@ class AnswerGenerationService:
 
     def answer(self, payload: AnswerRequest) -> AnswerResponse:
         retrieved_chunks = self._retrieval_service.search(payload)
+        reranker_enabled = getattr(self._retrieval_service, "reranker_enabled", False)
         threshold = (
             payload.similarity_score_threshold
             if payload.similarity_score_threshold is not None
@@ -39,6 +40,8 @@ class AnswerGenerationService:
                 answer=INSUFFICIENT_CONTEXT_ANSWER,
                 citations=[],
                 retrieved_chunks_count=0,
+                reranker_enabled=reranker_enabled,
+                retrieved_chunks=[],
             )
 
         answer = self._llm_provider.generate_answer(
@@ -57,4 +60,6 @@ class AnswerGenerationService:
             answer=answer,
             citations=citations,
             retrieved_chunks_count=len(assembled_context.retrieved_chunks),
+            reranker_enabled=reranker_enabled,
+            retrieved_chunks=assembled_context.retrieved_chunks,
         )

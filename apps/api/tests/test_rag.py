@@ -12,6 +12,7 @@ from atlas_api.core.dependencies import (
     get_embedding_provider,
     get_llm_provider,
     get_query_rewrite_service,
+    get_reranker_service,
     get_upload_dir,
 )
 from atlas_api.db.base import Base
@@ -21,7 +22,9 @@ from atlas_api.llm_providers.fake import FakeLLMProvider
 from atlas_api.main import create_app
 from atlas_api.models import Chunk, ChunkEmbedding, Document
 from atlas_api.query_rewrite_providers.fake import FakeQueryRewriteProvider
+from atlas_api.reranker_providers.fake import FakeRerankerProvider
 from atlas_api.services.query_rewrite import QueryRewriteService
+from atlas_api.services.reranking import RerankerService
 
 TestingSessionFactory = sessionmaker[Session]
 
@@ -54,12 +57,21 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     def override_get_query_rewrite_service() -> QueryRewriteService:
         return QueryRewriteService(FakeQueryRewriteProvider())
 
+    def override_get_reranker_service() -> RerankerService:
+        return RerankerService(
+            provider=FakeRerankerProvider(),
+            enabled=False,
+            top_k=5,
+            score_threshold=0.8,
+        )
+
     app = create_app()
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_upload_dir] = override_get_upload_dir
     app.dependency_overrides[get_embedding_provider] = override_get_embedding_provider
     app.dependency_overrides[get_llm_provider] = override_get_llm_provider
     app.dependency_overrides[get_query_rewrite_service] = override_get_query_rewrite_service
+    app.dependency_overrides[get_reranker_service] = override_get_reranker_service
 
     with TestClient(app) as test_client:
         yield test_client
@@ -137,7 +149,64 @@ def test_search_response_includes_chunk_metadata_and_score(client: TestClient) -
     assert result["chunk_index"] == 0
     assert "Atlas retrieval exposes source metadata." in result["text"]
     assert isinstance(result["similarity_score"], float)
+    assert isinstance(result["keyword_rank"], float)
+    assert result["matched_by"] == ["vector", "keyword"]
     assert text in result["matched_queries"]
+    assert result["reranker_enabled"] is False
+    assert result["reranker_score"] is None
+
+
+def test_keyword_search_finds_exact_technical_terms(client: TestClient) -> None:
+    upload_text_document(
+        client,
+        "indexes.md",
+        "learning",
+        "PostgreSQL pgvector can use HNSW indexes for approximate nearest neighbor search.",
+    )
+    upload_text_document(
+        client,
+        "generation.md",
+        "learning",
+        "Answer generation uses retrieved context and citations.",
+    )
+
+    response = client.post(
+        "/rag/search",
+        json={"query": "HNSW", "search_mode": "keyword"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["source_name"] == "indexes.md"
+    assert payload[0]["similarity_score"] is None
+    assert payload[0]["keyword_rank"] > 0
+    assert payload[0]["matched_by"] == ["keyword"]
+
+
+def test_search_mode_selects_vector_keyword_and_hybrid(client: TestClient) -> None:
+    text = "Hybrid retrieval combines pgvector similarity with keyword matches."
+    upload_text_document(client, "hybrid.md", "learning", text)
+
+    vector_response = client.post(
+        "/rag/search",
+        json={"query": text, "search_mode": "vector"},
+    )
+    keyword_response = client.post(
+        "/rag/search",
+        json={"query": "pgvector", "search_mode": "keyword"},
+    )
+    hybrid_response = client.post(
+        "/rag/search",
+        json={"query": text, "search_mode": "hybrid"},
+    )
+
+    assert vector_response.status_code == 200
+    assert keyword_response.status_code == 200
+    assert hybrid_response.status_code == 200
+    assert vector_response.json()[0]["matched_by"] == ["vector"]
+    assert keyword_response.json()[0]["matched_by"] == ["keyword"]
+    assert hybrid_response.json()[0]["matched_by"] == ["vector", "keyword"]
 
 
 def test_answer_generation_returns_citations_separately(client: TestClient) -> None:
@@ -154,6 +223,9 @@ def test_answer_generation_returns_citations_separately(client: TestClient) -> N
         {"source": "answer.md", "section": "Unspecified", "chunk_id": "1"}
     ]
     assert payload["retrieved_chunks_count"] == 1
+    assert payload["reranker_enabled"] is False
+    assert payload["retrieved_chunks"][0]["source_name"] == "answer.md"
+    assert payload["retrieved_chunks"][0]["matched_by"] == ["vector", "keyword"]
 
 
 def test_answer_generation_returns_insufficient_context_without_matches(client: TestClient) -> None:
@@ -167,4 +239,6 @@ def test_answer_generation_returns_insufficient_context_without_matches(client: 
         "answer": "Insufficient context to answer the question.",
         "citations": [],
         "retrieved_chunks_count": 0,
+        "reranker_enabled": False,
+        "retrieved_chunks": [],
     }
