@@ -16,3 +16,30 @@ class SearchResult(BaseModel):
     chunk_index: int
     text: str
     similarity_score: float
+
+
+class ContextPreviewRequest(SearchRequest):
+    max_chunks: int | None = Field(default=None, ge=1, le=100)
+    similarity_score_threshold: float | None = Field(default=None, ge=-1, le=1)
+
+
+class ContextPreviewResponse(BaseModel):
+    query: str
+    retrieved_chunks: list[SearchResult]
+    assembled_context: str
+
+
+class AnswerRequest(SearchRequest):
+    similarity_score_threshold: float | None = Field(default=None, ge=-1, le=1)
+
+
+class Citation(BaseModel):
+    source: str
+    section: str
+    chunk_id: str
+
+
+class AnswerResponse(BaseModel):
+    answer: str
+    citations: list[Citation]
+    retrieved_chunks_count: int

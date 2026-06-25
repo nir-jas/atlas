@@ -51,30 +51,37 @@ routers or `include_router()`, and the app entrypoint only composes routers.
 The service layer owns application behavior. It coordinates repositories and AI
 providers, keeps use cases testable, and avoids framework-specific code.
 
-Current location:
+Current locations:
 
 - `apps/api/src/atlas_api/services/knowledge.py`
+- `apps/api/src/atlas_api/services/documents.py`
+- `apps/api/src/atlas_api/services/retrieval.py`
 
 ### Repository Layer
 
-The repository layer hides persistence details behind protocols. The current
-scaffold uses an in-memory repository for a runnable first version. PostgreSQL
-and pgvector are available through Docker Compose for the real implementation.
+The repository layer hides persistence details behind protocols. Document
+indexing and retrieval use PostgreSQL; pgvector performs the production cosine
+similarity search in the database, while the in-memory repository remains for
+the separate knowledge feature.
 
 Current location:
 
 - `apps/api/src/atlas_api/repositories/base.py`
 - `apps/api/src/atlas_api/repositories/memory.py`
+- `apps/api/src/atlas_api/repositories/documents.py`
+- `apps/api/src/atlas_api/repositories/retrieval.py`
 
 ### AI Provider Abstraction
 
-The AI provider abstraction keeps model vendors out of services and API routes.
-The local provider returns deterministic responses for development and tests.
+The embedding provider abstraction keeps embedding vendors out of services and
+API routes. `fake` is deterministic and the default for tests; `openai` calls
+the OpenAI embeddings API when explicitly selected through configuration.
 
 Current location:
 
 - `apps/api/src/atlas_api/ai_providers/base.py`
 - `apps/api/src/atlas_api/ai_providers/local.py`
+- `apps/api/src/atlas_api/embedding_providers/`
 
 ## Data Policy
 
@@ -86,9 +93,10 @@ Current location:
 
 ## Growth Path
 
-1. Add SQLAlchemy models and migrations for documents, chunks, embeddings, and
-   learning notes.
-2. Implement a PostgreSQL repository using pgvector similarity search.
-3. Add external AI providers behind the existing `AIProvider` protocol.
+1. Add learning-note persistence and retrieval evaluation cases under `evals/`.
+2. Add a pgvector approximate-nearest-neighbor index once production corpus
+   size and query latency justify its maintenance cost.
+3. Add additional embedding providers behind the existing embedding-provider
+   protocol.
 4. Add evaluation cases under `evals/` before changing retrieval or generation
    behavior.

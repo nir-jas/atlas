@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,7 +24,12 @@ class ChunkEmbedding(Base):
     provider: Mapped[str] = mapped_column(String(120), nullable=False)
     model: Mapped[str] = mapped_column(String(120), nullable=False)
     dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False)
+    # SQLite is a lightweight unit-test database. PostgreSQL always receives
+    # pgvector's native vector type, including in production migrations.
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector().with_variant(JSON(), "sqlite"),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

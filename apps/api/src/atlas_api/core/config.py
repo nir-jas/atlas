@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,6 +19,13 @@ class Settings(BaseSettings):
     database_url: str | None = None
 
     vector_dimensions: int = 1536
+    embedding_provider: Literal["fake", "openai"] = "fake"
+    openai_api_key: str | None = None
+    embedding_model: str = "text-embedding-3-small"
+    llm_provider: Literal["fake", "openai"] = "fake"
+    llm_model: str = "gpt-5.4"
+    answer_similarity_score_threshold: float = 0.0
+    answer_context_max_characters: int = 12_000
     ai_provider: str = "local"
     upload_dir: str = "data/uploads"
 

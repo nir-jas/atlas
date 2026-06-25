@@ -25,3 +25,6 @@ class FakeEmbeddingProvider:
             dimensions=self.dimensions,
             embedding=values,
         )
+
+    def embed_texts(self, texts: list[str]) -> list[EmbeddingResult]:
+        return [self.embed_text(text) for text in texts]

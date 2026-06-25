@@ -45,8 +45,10 @@ class DocumentService:
                 return self._repository.create(document_create)
 
             embeddings = [
-                ChunkEmbeddingCreate(**self._embedding_provider.embed_text(chunk.text).model_dump())
-                for chunk in chunks
+                ChunkEmbeddingCreate(**embedding.model_dump())
+                for embedding in self._embedding_provider.embed_texts(
+                    [chunk.text for chunk in chunks]
+                )
             ]
             return self._repository.create_with_chunks(
                 document_create,

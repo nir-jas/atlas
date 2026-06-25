@@ -9,6 +9,7 @@ authors = []
 dependencies = [
     "alembic>=1.13.0",
     "fastapi>=0.111.0",
+    "openai>=1.0.0",
     "pgvector>=0.3.0",
     "psycopg[binary]>=3.2.0",
     "pydantic-settings>=2.3.0",
@@ -32,6 +33,9 @@ package = false
 [tool.pytest.ini_options]
 pythonpath = ["apps/api/src"]
 testpaths = ["apps/api/tests"]
+markers = [
+    "integration: requires an isolated PostgreSQL database with pgvector",
+]
 
 [tool.ruff]
 line-length = 100

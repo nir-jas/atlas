@@ -7,9 +7,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from atlas_api.core.dependencies import get_upload_dir
+from atlas_api.core.config import settings
+from atlas_api.core.dependencies import (
+    get_embedding_provider,
+    get_llm_provider,
+    get_upload_dir,
+)
 from atlas_api.db.base import Base
 from atlas_api.db.session import get_session
+from atlas_api.embedding_providers.fake import FakeEmbeddingProvider
+from atlas_api.llm_providers.fake import FakeLLMProvider
 from atlas_api.main import create_app
 from atlas_api.models import Chunk, ChunkEmbedding, Document
 
@@ -35,9 +42,17 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     def override_get_upload_dir() -> Path:
         return tmp_path / "uploads"
 
+    def override_get_embedding_provider() -> FakeEmbeddingProvider:
+        return FakeEmbeddingProvider(dimensions=settings.vector_dimensions)
+
+    def override_get_llm_provider() -> FakeLLMProvider:
+        return FakeLLMProvider()
+
     app = create_app()
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_upload_dir] = override_get_upload_dir
+    app.dependency_overrides[get_embedding_provider] = override_get_embedding_provider
+    app.dependency_overrides[get_llm_provider] = override_get_llm_provider
 
     with TestClient(app) as test_client:
         yield test_client
@@ -115,3 +130,33 @@ def test_search_response_includes_chunk_metadata_and_score(client: TestClient) -
     assert result["chunk_index"] == 0
     assert "Atlas retrieval exposes source metadata." in result["text"]
     assert isinstance(result["similarity_score"], float)
+
+
+def test_answer_generation_returns_citations_separately(client: TestClient) -> None:
+    text = "Atlas answers questions from retrieved document chunks."
+    upload_text_document(client, "answer.md", "learning", text)
+
+    response = client.post("/rag/answer", json={"query": text})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer"] == f"Fake grounded answer for: {text}"
+    assert payload["answer"].find("answer.md") == -1
+    assert payload["citations"] == [
+        {"source": "answer.md", "section": "Unspecified", "chunk_id": "1"}
+    ]
+    assert payload["retrieved_chunks_count"] == 1
+
+
+def test_answer_generation_returns_insufficient_context_without_matches(client: TestClient) -> None:
+    response = client.post(
+        "/rag/answer",
+        json={"query": "What is absent?", "collection": "missing"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "Insufficient context to answer the question.",
+        "citations": [],
+        "retrieved_chunks_count": 0,
+    }

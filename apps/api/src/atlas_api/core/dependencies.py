@@ -8,11 +8,18 @@ from sqlalchemy.orm import Session
 from atlas_api.ai_providers.local import LocalAIProvider
 from atlas_api.core.config import settings
 from atlas_api.db.session import get_session
+from atlas_api.embedding_providers.base import EmbeddingProvider
 from atlas_api.embedding_providers.fake import FakeEmbeddingProvider
+from atlas_api.embedding_providers.openai import OpenAIEmbeddingProvider
+from atlas_api.llm_providers.base import LLMProvider
+from atlas_api.llm_providers.fake import FakeLLMProvider
+from atlas_api.llm_providers.openai import OpenAILLMProvider
 from atlas_api.repositories.documents import DocumentRepository
 from atlas_api.repositories.memory import InMemoryKnowledgeRepository
 from atlas_api.repositories.retrieval import RetrievalRepository
+from atlas_api.services.answer_generation import AnswerGenerationService
 from atlas_api.services.chunking import ChunkingService
+from atlas_api.services.context_assembly import ContextAssemblyService
 from atlas_api.services.documents import DocumentService
 from atlas_api.services.knowledge import KnowledgeService
 from atlas_api.services.retrieval import RetrievalService
@@ -29,22 +36,83 @@ def get_upload_dir() -> Path:
     return Path(settings.upload_dir)
 
 
+@lru_cache
+def get_embedding_provider() -> EmbeddingProvider:
+    if settings.embedding_provider == "fake":
+        return FakeEmbeddingProvider(dimensions=settings.vector_dimensions)
+
+    return OpenAIEmbeddingProvider(
+        api_key=settings.openai_api_key or "",
+        model=settings.embedding_model,
+        dimensions=settings.vector_dimensions,
+    )
+
+
+@lru_cache
+def get_llm_provider() -> LLMProvider:
+    if settings.llm_provider == "fake":
+        return FakeLLMProvider()
+
+    return OpenAILLMProvider(
+        api_key=settings.openai_api_key or "",
+        model=settings.llm_model,
+    )
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 UploadDirDep = Annotated[Path, Depends(get_upload_dir)]
+EmbeddingProviderDep = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
+LLMProviderDep = Annotated[LLMProvider, Depends(get_llm_provider)]
 
 
-def get_document_service(session: SessionDep, upload_dir: UploadDirDep) -> DocumentService:
+def get_document_service(
+    session: SessionDep,
+    upload_dir: UploadDirDep,
+    embedding_provider: EmbeddingProviderDep,
+) -> DocumentService:
     repository = DocumentRepository(session)
     return DocumentService(
         repository=repository,
         upload_dir=upload_dir,
         chunking_service=ChunkingService(),
-        embedding_provider=FakeEmbeddingProvider(),
+        embedding_provider=embedding_provider,
     )
 
 
-def get_retrieval_service(session: SessionDep) -> RetrievalService:
+def get_retrieval_service(
+    session: SessionDep,
+    embedding_provider: EmbeddingProviderDep,
+) -> RetrievalService:
     return RetrievalService(
         repository=RetrievalRepository(session),
-        embedding_provider=FakeEmbeddingProvider(),
+        embedding_provider=embedding_provider,
+    )
+
+
+@lru_cache
+def get_context_assembly_service() -> ContextAssemblyService:
+    return ContextAssemblyService()
+
+
+ContextAssemblyServiceDep = Annotated[
+    ContextAssemblyService,
+    Depends(get_context_assembly_service),
+]
+
+
+def get_answer_generation_service(
+    session: SessionDep,
+    embedding_provider: EmbeddingProviderDep,
+    context_assembly_service: ContextAssemblyServiceDep,
+    llm_provider: LLMProviderDep,
+) -> AnswerGenerationService:
+    return AnswerGenerationService(
+        retrieval_service=RetrievalService(
+            repository=RetrievalRepository(session),
+            embedding_provider=embedding_provider,
+        ),
+        context_assembly_service=context_assembly_service,
+        llm_provider=llm_provider,
+        default_similarity_score_threshold=settings.answer_similarity_score_threshold,
+        max_context_characters=settings.answer_context_max_characters,
     )

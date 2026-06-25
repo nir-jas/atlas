@@ -7,7 +7,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from atlas_api.core.dependencies import get_upload_dir
+from atlas_api.core.config import settings
+from atlas_api.core.dependencies import get_embedding_provider, get_upload_dir
 from atlas_api.db.base import Base
 from atlas_api.db.session import get_session
 from atlas_api.embedding_providers.fake import FakeEmbeddingProvider
@@ -77,9 +78,13 @@ def client(tmp_path: Path, session_factory: TestingSessionFactory) -> Iterator[T
     def override_get_upload_dir() -> Path:
         return tmp_path / "uploads"
 
+    def override_get_embedding_provider() -> FakeEmbeddingProvider:
+        return FakeEmbeddingProvider(dimensions=settings.vector_dimensions)
+
     app = create_app()
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_upload_dir] = override_get_upload_dir
+    app.dependency_overrides[get_embedding_provider] = override_get_embedding_provider
 
     with TestClient(app) as test_client:
         yield test_client
@@ -379,6 +384,6 @@ def test_embedding_metadata_is_stored_correctly(
     assert embedding is not None
     assert embedding.provider == "fake"
     assert embedding.model == "fake-deterministic-v1"
-    assert embedding.dimensions == 8
-    assert len(embedding.embedding) == 8
+    assert embedding.dimensions == settings.vector_dimensions
+    assert len(embedding.embedding) == settings.vector_dimensions
     assert embedding.created_at is not None
