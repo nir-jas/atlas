@@ -1,0 +1,70 @@
+{
+  "documents": [
+    {
+      "filename": "atlas-retrieval.txt",
+      "collection": "learning",
+      "document_type": "note",
+      "text": "Atlas retrieval ranks matching chunks before context assembly."
+    },
+    {
+      "filename": "atlas-citations.txt",
+      "collection": "learning",
+      "document_type": "note",
+      "text": "Atlas keeps citation metadata separate from the generated answer text."
+    },
+    {
+      "filename": "atlas-public-fixtures.txt",
+      "collection": "reference",
+      "document_type": "note",
+      "text": "All bundled Atlas eval fixtures are synthetic and public-safe."
+    }
+  ],
+  "cases": [
+    {
+      "name": "retrieves-context-assembly-source",
+      "question": "Atlas retrieval ranks matching chunks before context assembly.",
+      "collection": "learning",
+      "top_k": 5,
+      "similarity_score_threshold": 1.0,
+      "expected_sources": ["atlas-retrieval.txt"],
+      "expected_answer_contains": [
+        "Fake grounded answer",
+        "Atlas retrieval ranks matching chunks"
+      ]
+    },
+    {
+      "name": "cites-selected-source",
+      "question": "Atlas keeps citation metadata separate from the generated answer text.",
+      "collection": "learning",
+      "top_k": 5,
+      "similarity_score_threshold": 1.0,
+      "expected_sources": ["atlas-citations.txt"],
+      "expected_answer_contains": [
+        "Fake grounded answer",
+        "citation metadata separate"
+      ]
+    },
+    {
+      "name": "collection-is-optional",
+      "question": "All bundled Atlas eval fixtures are synthetic and public-safe.",
+      "top_k": 5,
+      "similarity_score_threshold": 1.0,
+      "expected_sources": ["atlas-public-fixtures.txt"],
+      "expected_answer_contains": [
+        "Fake grounded answer",
+        "synthetic and public-safe"
+      ]
+    },
+    {
+      "name": "handles-no-context",
+      "question": "What does Atlas know about a private customer roadmap?",
+      "collection": "private",
+      "top_k": 5,
+      "similarity_score_threshold": 1.0,
+      "expected_sources": [],
+      "expected_answer_contains": [
+        "Insufficient context to answer the question."
+      ]
+    }
+  ]
+}

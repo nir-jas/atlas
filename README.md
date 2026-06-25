@@ -171,6 +171,20 @@ context budget, Atlas returns `Insufficient context to answer the question.`
 with an empty citation list and does not call the LLM. Provider call failures
 return HTTP 502 rather than a fabricated answer.
 
+## RAG Evals
+
+Atlas includes a small public-safe RAG evaluation fixture at
+`evals/rag_cases.json`. Run it with fake providers from the repository root:
+
+```bash
+uv run python scripts/run_rag_evals.py
+```
+
+The harness creates an isolated in-memory app, seeds synthetic documents, calls
+`/api/v1/rag/answer`, checks expected cited sources and answer phrases, verifies
+no-context handling, and prints per-case pass/fail plus a final score. It does
+not call OpenAI by default.
+
 ## Frontend Placeholder
 
 The frontend is intentionally minimal:
